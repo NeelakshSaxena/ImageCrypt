@@ -1,0 +1,27 @@
+# Virtual environment
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Runtime artifacts
+logs/
+output/
+
+# Large sample archive (58 MB, exceeds GitHub's recommended file size)
+assets/Pictures.zip
+
+# Agent tooling (symlinked skill bundles, not portable)
+.claude/
+
+# Environment / secrets
+.env
+.env.*
+
+# OS / editor
+Thumbs.db
+.DS_Store
