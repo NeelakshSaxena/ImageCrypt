@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Encrypted Image Flooding - Computer Networks Lab</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body class="theme-dark">
+    <!-- Top System Identification Banner (MANDATORY: Shows System IP and Assigned Ports) -->
+    <header class="system-banner" id="systemBanner">
+        <div class="banner-container">
+            <div class="system-brand">
+                <div class="brand-badge">
+                    <span class="pulse-dot"></span>
+                    <span id="systemRoleBadge" class="role-badge sender">SENDER SYSTEM</span>
+                </div>
+                <h1 class="brand-title">ImageCrypt <span class="lab-tag">CN Lab Suite</span></h1>
+            </div>
+
+            <div class="system-details-grid">
+                <div class="detail-box">
+                    <span class="detail-label">Current System IP</span>
+                    <span class="detail-value mono" id="bannerSystemIp">Detecting...</span>
+                </div>
+                <div class="detail-box">
+                    <span class="detail-label">Data Transport Port</span>
+                    <span class="detail-value mono text-cyan" id="bannerDataPort">----</span>
+                </div>
+                <div class="detail-box">
+                    <span class="detail-label">Web Server Port</span>
+                    <span class="detail-value mono text-purple" id="bannerWebPort">----</span>
+                </div>
+                <div class="detail-box">
+                    <span class="detail-label">Network Status</span>
+                    <span class="detail-value status-indicator online" id="bannerNetStatus">
+                        <span class="indicator-icon">●</span> Active
+                    </span>
+                </div>
+            </div>
+
+            <div class="banner-actions">
+                <button id="btnRunTest" class="btn btn-outline" title="Test Socket Connectivity">
+                    <span class="btn-icon">⚡</span> Test Links
+                </button>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs to switch perspective / screen -->
+        <nav class="nav-bar">
+            <div class="nav-tabs">
+                <button class="nav-tab active" data-tab="sender-screen" id="tabSender">
+                    <span class="tab-icon">📤</span> Sender Screen
+                </button>
+                <button class="nav-tab" data-tab="intermediate-screen" id="tabIntermediate">
+                    <span class="tab-icon">🔀</span> Intermediate Screen (Raw Data)
+                </button>
+                <button class="nav-tab" data-tab="receiver-screen" id="tabReceiver">
+                    <span class="tab-icon">📥</span> Receiver Screen (Decryption)
+                </button>
+                <button class="nav-tab" data-tab="topology-screen" id="tabTopology">
+                    <span class="tab-icon">🌐</span> Lab Topology Map
+                </button>
+            </div>
+            <div class="nav-status">
+                <span id="activeRoleNotice" class="role-notice">Viewing Node Perspective</span>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+
+        <!-- ===================================================================
+             SCREEN 1: SENDER SCREEN
+        ==================================================================== -->
+        <section class="screen-view active" id="sender-screen">
+            <div class="screen-header">
+                <div class="screen-title-area">
+                    <h2>Sender Station <span class="node-id-badge">Node A</span></h2>
+                    <p class="screen-desc">Loads image, executes Bit-Shuffle encryption, fragments into 1024-byte packets, and floods intermediate nodes.</p>
+                </div>
+                <div class="quick-status-card">
+                    <span class="qs-label">Assigned Data Port</span>
+                    <span class="qs-value mono" id="senderAssignedPort">5000</span>
+                    <span class="qs-sub" id="senderAssignedIp">IP: 127.0.0.1</span>
+                </div>
+            </div>
+
+            <div class="grid-layout sender-layout">
+                <!-- Left Panel: Image Loading & Previews -->
+                <div class="card panel-image-select">
+                    <div class="card-header">
+                        <h3>1. Image Selection & Payload Prep</h3>
+                        <span class="badge" id="imageStatusBadge">Ready</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="drop-zone" id="dropZone">
+                            <input type="file" id="fileInput" accept="image/png, image/jpeg" style="display:none;">
+                            <div class="drop-content" id="dropPrompt">
+                                <div class="upload-icon">🖼️</div>
+                                <p class="drop-main-text">Drag & drop an image here or</p>
+                                <button type="button" class="btn btn-secondary" id="btnBrowse">Browse File</button>
+                                <button type="button" class="btn btn-ghost" id="btnUseSample">Use Lab Sample Image</button>
+                                <p class="drop-hint">Supports PNG, JPG (Recommended size &lt; 500 KB)</p>
+                            </div>
+                        </div>
+
+                        <!-- Image Metadata Cards -->
+                        <div class="meta-grid" id="imageMetaGrid">
+                            <div class="meta-item">
+                                <span class="meta-label">Original Dimensions</span>
+                                <span class="meta-value" id="metaDimensions">-- x --</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">Raw Payload Size</span>
+                                <span class="meta-value" id="metaSize">-- KB</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">Fragment Chunks</span>
+                                <span class="meta-value text-cyan" id="metaChunks">-- (1024B ea)</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">Target Neighbors</span>
+                                <span class="meta-value text-emerald" id="metaNeighbors">-- Intermediates</span>
+                            </div>
+                        </div>
+
+                        <!-- Preview Panels -->
+                        <div class="image-previews-container">
+                            <div class="preview-box">
+                                <div class="preview-header">
+                                    <span>Original Image</span>
+                                    <span class="tag">Cleartext</span>
+                                </div>
+                                <div class="preview-canvas-wrapper">
+                                    <img id="imgOriginalPreview" src="/api/image/original" alt="Original Image Preview" onerror="this.src='/placeholder.png';">
+                                </div>
+                            </div>
+                            <div class="preview-box">
+                                <div class="preview-header">
+                                    <span>Bit-Shuffle Ciphertext</span>
+                                    <span class="tag tag-amber">Encrypted Noise</span>
+                                </div>
+                                <div class="preview-canvas-wrapper">
+                                    <img id="imgEncryptedPreview" src="/api/image/encrypted" alt="Encrypted Noise Preview" onerror="this.src='/placeholder.png';">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Panel: Cryptography & Flooding Dispatcher -->
+                <div class="card panel-crypto-send">
+                    <div class="card-header">
+                        <h3>2. Bit-Shuffle Cryptography & Flooding</h3>
+                        <span class="badge badge-purple">4-Stage Pipeline</span>
+                    </div>
+                    <div class="card-body">
+                        <!-- Encryption Pipeline Explanation -->
+                        <div class="crypto-pipeline-cards">
+                            <div class="pipeline-step">
+                                <div class="step-num">1</div>
+                                <div class="step-info">
+                                    <strong>Bit Inversion</strong>
+                                    <code>~byte &amp; 0xFF</code>
+                                </div>
+                            </div>
+                            <div class="pipeline-step">
+                                <div class="step-num">2</div>
+                                <div class="step-info">
+                                    <strong>Order Shuffle</strong>
+                                    <code>[5, 2, 7, 0, 4, 1, 6, 3]</code>
+                                </div>
+                            </div>
+                            <div class="pipeline-step">
+                                <div class="step-num">3</div>
+                                <div class="step-info">
+                                    <strong>Magic Offset</strong>
+                                    <code>(b - 42) % 256</code>
+                                </div>
+                            </div>
+                            <div class="pipeline-step">
+                                <div class="step-num">4</div>
+                                <div class="step-info">
+                                    <strong>Key XOR</strong>
+                                    <code>b ^ AES_KEY[i]</code>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Flooding Action Control -->
+                        <div class="transmit-control-box">
+                            <div class="target-nodes-list" id="senderTargetList">
+                                <span class="targets-label">Flooding Targets:</span>
+                                <div class="target-badges" id="senderTargetBadges">
+                                    <!-- Dynamic badges -->
+                                </div>
+                            </div>
+
+                            <button id="btnTransmitImage" class="btn btn-primary btn-large btn-glow">
+                                <span class="btn-icon">🚀</span> Start Network Flooding Transmission
+                            </button>
+                        </div>
+
+                        <!-- Live Transmission Progress -->
+                        <div class="progress-section" id="senderProgressSection">
+                            <div class="progress-header">
+                                <span>Transmission Progress</span>
+                                <span id="senderProgressPercent" class="mono">0%</span>
+                            </div>
+                            <div class="progress-bar-container">
+                                <div class="progress-bar" id="senderProgressBar" style="width: 0%;"></div>
+                            </div>
+                            <div class="progress-stats-row">
+                                <span>Sent: <strong id="senderPacketsSent">0</strong> packets</span>
+                                <span>Payload: <strong id="senderBytesSent">0</strong> bytes</span>
+                                <span>Status: <strong id="senderTxStatus" class="text-amber">Idle</strong></span>
+                            </div>
+                        </div>
+
+                        <!-- Live Dispatch Feed -->
+                        <div class="live-dispatch-console">
+                            <div class="console-header">
+                                <span>Live Packet Dispatch Feed</span>
+                                <button class="btn-tiny" id="btnClearSenderLog">Clear</button>
+                            </div>
+                            <div class="console-body mono" id="senderDispatchLog">
+                                <div class="log-line text-muted">[System ready. Select an image and click "Start Network Flooding Transmission"]</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===================================================================
+             SCREEN 2: INTERMEDIATE SCREEN (RAW DATA STREAM)
+        ==================================================================== -->
+        <section class="screen-view" id="intermediate-screen">
+            <div class="screen-header">
+                <div class="screen-title-area">
+                    <h2>Intermediate Node Router <span class="node-id-badge node-b" id="intermediateBadge">Node B (Intermediate 1)</span></h2>
+                    <p class="screen-desc">Inspects header, prevents loops via duplicate dropping, decrements TTL, and forwards unmodified payload to Receiver.</p>
+                </div>
+
+                <!-- Intermediate Node Selector (for lab overview) -->
+                <div class="node-selector-box">
+                    <label for="selectIntermediateNode">Select Intermediary:</label>
+                    <select id="selectIntermediateNode" class="select-styled">
+                        <!-- Populated dynamically: Node 1, 2, 3... -->
+                    </select>
+                </div>
+            </div>
+
+            <!-- Current Node Credentials Card -->
+            <div class="system-creds-strip">
+                <div class="cred-chip">
+                    <span class="cred-label">Current Node Role:</span>
+                    <span class="cred-val" id="intNodeRoleName">Intermediate Node 1</span>
+                </div>
+                <div class="cred-chip">
+                    <span class="cred-label">System IP:</span>
+                    <span class="cred-val mono" id="intNodeIp">127.0.0.1</span>
+                </div>
+                <div class="cred-chip">
+                    <span class="cred-label">Assigned Port:</span>
+                    <span class="cred-val mono text-cyan" id="intNodePort">5001</span>
+                </div>
+                <div class="cred-chip">
+                    <span class="cred-label">Forwarding Destination:</span>
+                    <span class="cred-val mono text-emerald" id="intForwardTarget">Receiver (127.0.0.1:5004)</span>
+                </div>
+            </div>
+
+            <!-- Stats Bar -->
+            <div class="stats-bar-grid">
+                <div class="stat-card">
+                    <div class="stat-icon text-cyan">📥</div>
+                    <div class="stat-content">
+                        <span class="stat-num" id="intTotalReceived">0</span>
+                        <span class="stat-name">Packets Intercepted</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon text-emerald">↗️</div>
+                    <div class="stat-content">
+                        <span class="stat-num" id="intTotalForwarded">0</span>
+                        <span class="stat-name">Forwarded to Receiver</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon text-red">🚫</div>
+                    <div class="stat-content">
+                        <span class="stat-num" id="intDuplicatesDropped">0</span>
+                        <span class="stat-name">Duplicates Dropped</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon text-amber">⏳</div>
+                    <div class="stat-content">
+                        <span class="stat-num" id="intTtlDropped">0</span>
+                        <span class="stat-name">TTL Expired (TTL=0)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Core Feature: Raw Data Stream & Packet Inspector -->
+            <div class="raw-data-container card">
+                <div class="card-header">
+                    <div class="header-left">
+                        <h3>Raw Data Stream &amp; Packet Inspector</h3>
+                        <span class="badge badge-live">LIVE WIRE STREAM</span>
+                    </div>
+                    <div class="header-controls">
+                        <label class="filter-label">Filter Action:</label>
+                        <select id="rawFilterAction" class="select-styled select-sm">
+                            <option value="all">All Actions</option>
+                            <option value="forwarded">Forwarded Only</option>
+                            <option value="duplicate">Dropped Duplicates Only</option>
+                            <option value="ttl">Dropped TTL=0 Only</option>
+                        </select>
+                        <button class="btn btn-sm btn-ghost" id="btnToggleAutoScroll">Auto-scroll: ON</button>
+                        <button class="btn btn-sm btn-ghost" id="btnClearRawStream">Clear Stream</button>
+                    </div>
+                </div>
+
+                <div class="card-body raw-stream-split">
+                    <!-- Left: Stream List of Packets -->
+                    <div class="raw-stream-list" id="rawPacketStream">
+                        <div class="stream-empty-notice" id="rawStreamEmpty">
+                            <div class="empty-icon">📡</div>
+                            <p>Waiting for incoming packets on port <span id="rawListenPort" class="mono">5001</span>...</p>
+                            <span class="empty-hint">When Sender floods packets, each packet's raw hex byte dump and routing decision will appear here in real-time.</span>
+                        </div>
+                    </div>
+
+                    <!-- Right: Deep Packet Inspection Panel -->
+                    <div class="raw-inspector-panel" id="rawInspector">
+                        <div class="inspector-header">
+                            <h4>Selected Packet Analysis</h4>
+                            <span class="packet-tag" id="inspPacketTag">#--</span>
+                        </div>
+
+                        <!-- Header Fields Breakdown Table -->
+                        <div class="header-breakdown-card">
+                            <div class="breakdown-title">Header Fields (17 Bytes packed '!4sBBIHHBH')</div>
+                            <table class="packet-fields-table">
+                                <thead>
+                                    <tr>
+                                        <th>Field</th>
+                                        <th>Type</th>
+                                        <th>Size</th>
+                                        <th>Decoded Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><code>magic</code></td>
+                                        <td>bytes</td>
+                                        <td>4B</td>
+                                        <td class="mono text-cyan" id="hdrMagic">IMGF</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>src_id</code></td>
+                                        <td>uint8</td>
+                                        <td>1B</td>
+                                        <td class="mono" id="hdrSrcId">0 (Sender A)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>dest_id</code></td>
+                                        <td>uint8</td>
+                                        <td>1B</td>
+                                        <td class="mono" id="hdrDestId">4 (Receiver E)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>packet_id</code></td>
+                                        <td>uint32</td>
+                                        <td>4B</td>
+                                        <td class="mono text-amber" id="hdrPacketId">--</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>chunk_sequence</code></td>
+                                        <td>uint16</td>
+                                        <td>2B</td>
+                                        <td class="mono text-emerald" id="hdrChunkSeq">--</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>total_chunks</code></td>
+                                        <td>uint16</td>
+                                        <td>2B</td>
+                                        <td class="mono" id="hdrTotalChunks">--</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>ttl</code></td>
+                                        <td>uint8</td>
+                                        <td>1B</td>
+                                        <td class="mono" id="hdrTtl">--</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>payload_length</code></td>
+                                        <td>uint16</td>
+                                        <td>2B</td>
+                                        <td class="mono" id="hdrPayloadLen">-- bytes</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Routing Action Banner -->
+                        <div class="routing-decision-banner" id="inspDecisionBanner">
+                            <span class="decision-icon">ℹ️</span>
+                            <span class="decision-text" id="inspDecisionText">Select a packet from the stream to view its routing decision</span>
+                        </div>
+
+                        <!-- Hex Dump View -->
+                        <div class="hexdump-viewer">
+                            <div class="hexdump-header">
+                                <span>Raw Hex Dump (Header + Payload sample)</span>
+                            </div>
+                            <pre class="hexdump-content mono" id="inspHexDump">Select a packet on the left to inspect raw bytes...</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===================================================================
+             SCREEN 3: RECEIVER SCREEN (DECRYPTION & RECONSTRUCTION)
+        ==================================================================== -->
+        <section class="screen-view" id="receiver-screen">
+            <div class="screen-header">
+                <div class="screen-title-area">
+                    <h2>Receiver Station <span class="node-id-badge node-e">Node E</span></h2>
+                    <p class="screen-desc">Collects incoming fragments, filters duplicate arrivals, reassembles in order, executes inverse Bit-Shuffle decryption, and renders the image.</p>
+                </div>
+                <div class="quick-status-card">
+                    <span class="qs-label">Assigned Data Port</span>
+                    <span class="qs-value mono" id="receiverAssignedPort">5004</span>
+                    <span class="qs-sub" id="receiverAssignedIp">IP: 127.0.0.1</span>
+                </div>
+            </div>
+
+            <!-- Receiver Stats Grid -->
+            <div class="stats-bar-grid">
+                <div class="stat-card">
+                    <div class="stat-icon text-cyan">🧩</div>
+                    <div class="stat-content">
+                        <span class="stat-num" id="rxChunksReceived">0 / 0</span>
+                        <span class="stat-name">Fragments Collected</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon text-purple">🛡️</div>
+                    <div class="stat-content">
+                        <span class="stat-num" id="rxDuplicatesFiltered">0</span>
+                        <span class="stat-name">Flooding Duplicates Ignored</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon text-emerald">🔓</div>
+                    <div class="stat-content">
+                        <span class="stat-num" id="rxDecryptionStatus">Waiting</span>
+                        <span class="stat-name">Reconstruction Status</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon text-amber">🔍</div>
+                    <div class="stat-content">
+                        <span class="stat-num" id="rxSha256Match">--</span>
+                        <span class="stat-name">SHA-256 Integrity</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Buffer Matrix Visualization -->
+            <div class="card matrix-card">
+                <div class="card-header">
+                    <h3>Fragment Buffer Matrix (In-Order Sequence Buffer)</h3>
+                    <div class="matrix-legend">
+                        <span class="legend-item"><span class="legend-box pending"></span> Awaiting Fragment</span>
+                        <span class="legend-item"><span class="legend-box received"></span> Fragment Arrived</span>
+                        <span class="legend-item"><span class="legend-box reassembled"></span> Reassembled &amp; Verified</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="buffer-grid" id="rxBufferGrid">
+                        <div class="buffer-empty-msg">No transmission active. Waiting for Sender to flood image fragments...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Side-by-Side Decryption & Reconstruction Result -->
+            <div class="reconstruction-showcase grid-layout">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Encrypted Ciphertext Stream (Before Decryption)</h3>
+                        <span class="badge badge-amber">Scrambled Bits</span>
+                    </div>
+                    <div class="card-body text-center">
+                        <div class="showcase-img-wrapper">
+                            <img id="rxEncryptedNoiseImg" src="/api/image/encrypted" alt="Encrypted State" onerror="this.src='/placeholder.png';">
+                        </div>
+                        <p class="img-caption text-muted">What intermediate nodes forward without key</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Decrypted &amp; Reconstructed Output</h3>
+                        <span class="badge badge-emerald" id="rxSuccessBadge">Pending</span>
+                    </div>
+                    <div class="card-body text-center">
+                        <div class="showcase-img-wrapper">
+                            <img id="rxReconstructedImg" src="/api/image/reconstructed" alt="Decrypted Output" onerror="this.src='/placeholder.png';">
+                        </div>
+                        <div class="action-row">
+                            <a id="btnDownloadImage" href="/api/image/reconstructed" download="reconstructed_image.png" class="btn btn-secondary btn-sm disabled">
+                                <span class="btn-icon">💾</span> Download Reconstructed Image
+                            </a>
+                        </div>
+                        <div class="hash-box mono" id="rxHashDisplay">SHA-256: Awaiting completion...</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===================================================================
+             SCREEN 4: LAB TOPOLOGY & DIAGNOSTICS SCREEN
+        ==================================================================== -->
+        <section class="screen-view" id="topology-screen">
+            <div class="screen-header">
+                <div class="screen-title-area">
+                    <h2>Lab Network Topology &amp; Link Diagnostics</h2>
+                    <p class="screen-desc">Interactive overview of the computer networks lab topology showing all nodes, IP addresses, ports, and live link statuses.</p>
+                </div>
+                <button class="btn btn-primary" id="btnRefreshDiagnostics">
+                    <span class="btn-icon">🔄</span> Re-Test All Socket Links
+                </button>
+            </div>
+
+            <div class="card topology-card">
+                <div class="card-header">
+                    <h3>Physical / Virtual Network Graph</h3>
+                    <span class="badge">Flooding Mesh</span>
+                </div>
+                <div class="card-body">
+                    <!-- Dynamic Topology Canvas / Diagram -->
+                    <div class="topo-diagram" id="topoDiagram">
+                        <!-- Sender Node Box -->
+                        <div class="topo-col sender-col">
+                            <div class="topo-node-card sender-card" id="topoNodeSender">
+                                <div class="node-icon">📤</div>
+                                <div class="node-title">Node A (Sender)</div>
+                                <div class="node-ip mono" id="topoSenderIp">--:--</div>
+                                <span class="node-status-pill online">Active</span>
+                            </div>
+                        </div>
+
+                        <!-- Intermediate Nodes Column -->
+                        <div class="topo-col intermediate-col" id="topoIntermediatesCol">
+                            <!-- Populated dynamically -->
+                        </div>
+
+                        <!-- Receiver Node Box -->
+                        <div class="topo-col receiver-col">
+                            <div class="topo-node-card receiver-card" id="topoNodeReceiver">
+                                <div class="node-icon">📥</div>
+                                <div class="node-title">Node E (Receiver)</div>
+                                <div class="node-ip mono" id="topoReceiverIp">--:--</div>
+                                <span class="node-status-pill online">Listening</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Configured Nodes Table -->
+                    <div class="table-container">
+                        <table class="nodes-table" id="nodesConfigTable">
+                            <thead>
+                                <tr>
+                                    <th>Node ID</th>
+                                    <th>Role Name</th>
+                                    <th>Configured IP Address</th>
+                                    <th>Assigned Port</th>
+                                    <th>Web Server Port</th>
+                                    <th>Link Connectivity</th>
+                                </tr>
+                            </thead>
+                            <tbody id="nodesTableBody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal for Connection Test Progress -->
+    <div class="modal-backdrop" id="testModal" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Socket Connectivity Test</h3>
+                <button class="modal-close" id="btnCloseModal">&times;</button>
+            </div>
+            <div class="modal-body" id="modalTestBody">
+                <p>Testing socket connections to all configured nodes...</p>
+                <div class="test-results-list" id="modalTestList"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="btnModalClose">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/app.js"></script>
+</body>
+</html>
