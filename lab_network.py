@@ -3,7 +3,7 @@ lab_network.py: Encrypted Image Flooding Simulation for Computer Networks Lab.
 
 This script runs on any lab system (out of 70+ networked PCs).
 Features:
-  1. Interactive questionnaire to configure Sender, Receiver, and 3-6 Intermediates.
+  1. Interactive questionnaire to configure Sender, Receiver, and 1-6 Intermediates.
   2. Automated connection testing across all endpoints.
   3. Embedded HTML/CSS/JS web server with live WebSocket/REST synchronization.
   4. Specialized screens for:
@@ -201,18 +201,18 @@ def run_configuration_wizard(local_ip: str) -> dict:
     print("[3/3] INTERMEDIATE SYSTEMS CONFIGURATION")
     print("-" * 76)
     while True:
-        count_str = input("How many intermediate systems do you need? (Min: 3, Max: 6) [Default: 3]: ").strip()
+        count_str = input("How many intermediate systems do you need? (Min: 1, Max: 6) [Default: 3]: ").strip()
         if not count_str:
             num_intermediates = 3
             break
         try:
             n = int(count_str)
-            if 3 <= n <= 6:
+            if 1 <= n <= 6:
                 num_intermediates = n
                 break
-            print("Error: Minimum is 3 intermediate systems, maximum is 6.")
+            print("Error: Please choose between 1 and 6 intermediate systems.")
         except ValueError:
-            print("Please enter a valid integer between 3 and 6.")
+            print("Please enter a valid integer between 1 and 6.")
 
     letter_names = ['B', 'C', 'D', 'F', 'G', 'H']
     intermediates = []

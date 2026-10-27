@@ -10,13 +10,16 @@ A network simulation and lab demonstration suite of a secure, flooding-based net
 
 ## 🌟 Computer Networks Lab Suite (`lab_network.py`)
 
+> [!TIP]
+> **Allotted 3 physical PCs in the lab?** Check out the dedicated step-by-step setup guide: [**`lab_how_to.md`**](./lab_how_to.md).
+
 Designed for **Computer Networks Labs with up to 70 networked PCs**, this standalone script allows students and instructors to deploy the simulation across multiple physical systems communicating over LAN via IP addresses and TCP sockets, complete with an interactive web dashboard.
 
 ### Key Features
 1. **Interactive Setup Questionnaire**:
    - Asks for the **Sender System IP** (with local IP auto-detection) and port selection (`5000`, `5050`, `8000`, or custom).
    - Asks for the **Receiver System IP** and port selection (`5004`, `5054`, `8004`, or custom).
-   - Asks for the **number of Intermediate systems** (strictly validated between **3 and 6**).
+   - Asks for the **number of Intermediate systems** (flexible between **1 and 6**, minimum 1).
    - For each intermediate system, prompts for its IP address and port options (`5001`, `5002`, `5003`...).
 
 2. **Automated Socket Connection Test**:
@@ -109,9 +112,9 @@ This boots the Receiver (`5004`), 3 Intermediates (`5001`, `5002`, `5003`), runs
 
 ---
 
-## Legacy Tkinter GUI Mode (`gui.py`)
+## Desktop GUI Suite for Lab Network (`gui.py`)
 
-A desktop Tkinter interface is also available for local demonstration:
+A modern desktop Tkinter control center is available to control and visualize `lab_network.py`:
 
 1. **Activate the Virtual Environment**:
    ```powershell
@@ -123,7 +126,11 @@ A desktop Tkinter interface is also available for local demonstration:
    ```bash
    python gui.py
    ```
-3. Use buttons `1. Start Network Nodes`, `2. Select Image`, `3. Encrypt Image`, and `4. Send Image` to observe the flow.
+3. **Features in `gui.py`**:
+   - **Lab Network Deployment Control**: Launch `lab_network.py` in All-in-One simulation, Sender Station, Intermediate Router, or Receiver Station with custom web and transport ports.
+   - **One-Click Web Dashboard**: Instant button to open `http://localhost:8080`.
+   - **Socket Link Prober**: Interactive TCP testing across intermediate routers and receiver.
+   - **3-Panel Visualizer**: Live side-by-side view of Original Image (Node A), Bit-Shuffle Encrypted Ciphertext Noise (Nodes B/C/D), and Decrypted Reconstructed Image (Node E) with byte-exact **SHA-256 verification**.
 
 ---
 
