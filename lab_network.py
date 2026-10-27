@@ -51,6 +51,16 @@ except ImportError:
 os.makedirs(os.path.join(BASE_DIR, 'output'), exist_ok=True)
 os.makedirs(os.path.join(BASE_DIR, 'assets'), exist_ok=True)
 os.makedirs(os.path.join(BASE_DIR, 'logs'), exist_ok=True)
+os.makedirs(os.path.join(BASE_DIR, 'web'), exist_ok=True)
+
+# Ensure web/placeholder.png exists to prevent 404 and ConnectionAbortedError
+placeholder_file = os.path.join(BASE_DIR, 'web', 'placeholder.png')
+if not os.path.exists(placeholder_file):
+    try:
+        with open(placeholder_file, 'wb') as f:
+            f.write(b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\rIDATx\x9cc`\x00\x00\x00\x02\x00\x01H\xaf\xa4q\x00\x00\x00\x00IEND\xaeB`\x82')
+    except Exception:
+        pass
 
 # Global Application State
 APP_STATE = {
@@ -406,23 +416,31 @@ def execute_flooding_transmission(image_path: str = None) -> dict:
 
         # Send to all intermediate neighbors
         for node in targets:
-            try:
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                s.settimeout(2.0)
-                s.connect((node['ip'], node['port']))
-                s.sendall(packed_data)
-                s.close()
-                sent_count += 1
-                bytes_sent += len(packed_data)
-            except Exception as err:
-                add_event("error", f"Send error to {node['name']}: {err}", "sender")
+            sent = False
+            for attempt in range(3):
+                try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.settimeout(3.0)
+                    s.connect((node['ip'], node['port']))
+                    s.sendall(packed_data)
+                    s.close()
+                    sent_count += 1
+                    bytes_sent += len(packed_data)
+                    sent = True
+                    break
+                except Exception as err:
+                    time.sleep(0.04 * (attempt + 1))
+            if not sent:
+                add_event("error", f"Send timeout/error to {node['name']} after 3 attempts", "sender")
 
         with STATE_LOCK:
             APP_STATE["stats"]["packets_sent"] = sent_count
             APP_STATE["stats"]["bytes_sent"] = bytes_sent
 
         add_event("send", f"Dispatched fragment {chunk_seq + 1}/{total_chunks} (Packet #{packet_id}) to {len(targets)} nodes", "sender")
-        time.sleep(0.01)  # Flow control delay
+        # Adaptive pacing: gives network sockets time to complete handshake & teardown cleanly
+        delay = 0.02 if total_chunks < 80 else 0.035
+        time.sleep(delay)
 
     add_event("send", f"Flooding transmission complete! Total {sent_count} packets flooded.", "sender")
     return {"success": True, "total_chunks": total_chunks, "packets_sent": sent_count}
@@ -456,6 +474,7 @@ class IntermediateService:
         self.receiver_port = receiver_port
         self.seen_packets = set()
         self.running = True
+        self.lock = threading.Lock()
         self.stats = {
             "received": 0,
             "forwarded": 0,
@@ -472,7 +491,7 @@ class IntermediateService:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             sock.bind(('0.0.0.0', self.listen_port))
-            sock.listen(10)
+            sock.listen(128)
         except Exception as e:
             print(f"[Intermediate {self.node_id}] Bind error on port {self.listen_port}: {e}")
             return
@@ -491,10 +510,8 @@ class IntermediateService:
                     data += chunk
                 conn.close()
 
-                if len(data) < HEADER_SIZE:
-                    continue
-
-                self._process_packet(data)
+                if len(data) >= HEADER_SIZE:
+                    threading.Thread(target=self._process_packet, args=(data,), daemon=True).start()
             except socket.timeout:
                 continue
             except Exception as e:
@@ -502,7 +519,8 @@ class IntermediateService:
                     print(f"[Intermediate {self.node_id}] Socket error: {e}")
 
     def _process_packet(self, data: bytes):
-        self.stats["received"] += 1
+        with self.lock:
+            self.stats["received"] += 1
         pkt = None
         action = "UNKNOWN"
 
@@ -513,27 +531,40 @@ class IntermediateService:
             return
 
         # Check loop / duplicate
-        if pkt.packet_id in self.seen_packets:
-            self.stats["duplicates_dropped"] += 1
-            action = "DROPPED_DUPLICATE"
-        else:
-            self.seen_packets.add(pkt.packet_id)
-            pkt.ttl -= 1
-            if pkt.ttl == 0:
-                self.stats["ttl_dropped"] += 1
-                action = "DROPPED_TTL"
+        with self.lock:
+            if pkt.packet_id in self.seen_packets:
+                self.stats["duplicates_dropped"] += 1
+                action = "DROPPED_DUPLICATE"
+                should_forward = False
             else:
-                action = "FORWARDED"
-                # Forward to Receiver
+                self.seen_packets.add(pkt.packet_id)
+                pkt.ttl -= 1
+                if pkt.ttl == 0:
+                    self.stats["ttl_dropped"] += 1
+                    action = "DROPPED_TTL"
+                    should_forward = False
+                else:
+                    action = "FORWARDED"
+                    should_forward = True
+
+        if should_forward:
+            # Forward to Receiver with retry
+            forwarded = False
+            for attempt in range(3):
                 try:
                     fwd_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    fwd_sock.settimeout(2.0)
+                    fwd_sock.settimeout(3.0)
                     fwd_sock.connect((self.receiver_ip, self.receiver_port))
                     fwd_sock.sendall(pkt.pack())
                     fwd_sock.close()
-                    self.stats["forwarded"] += 1
+                    with self.lock:
+                        self.stats["forwarded"] += 1
+                    forwarded = True
+                    break
                 except Exception as fe:
-                    print(f"[Intermediate {self.node_id}] Forwarding error to receiver: {fe}")
+                    time.sleep(0.04 * (attempt + 1))
+            if not forwarded:
+                print(f"[Intermediate {self.node_id}] Forward timeout/error to receiver ({self.receiver_ip}:{self.receiver_port}): {fe}")
 
         # Record for web raw data stream
         record = {
@@ -583,7 +614,7 @@ class ReceiverService:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             sock.bind(('0.0.0.0', self.listen_port))
-            sock.listen(10)
+            sock.listen(128)
         except Exception as e:
             print(f"[Receiver] Bind error on port {self.listen_port}: {e}")
             return
@@ -603,7 +634,7 @@ class ReceiverService:
                 conn.close()
 
                 if len(data) >= HEADER_SIZE:
-                    self._process_packet(data)
+                    threading.Thread(target=self._process_packet, args=(data,), daemon=True).start()
             except socket.timeout:
                 continue
             except Exception as e:
@@ -616,27 +647,30 @@ class ReceiverService:
         except Exception:
             return
 
-        # Handle duplicate arrivals (from multi-path flooding)
-        if pkt.packet_id in self.seen_packets:
-            with STATE_LOCK:
-                APP_STATE["stats"]["duplicates_dropped"] += 1
-            return
-
-        self.seen_packets.add(pkt.packet_id)
-
-        if self.total_chunks is None:
-            self.total_chunks = pkt.total_chunks
-
-        self.received_chunks[pkt.chunk_sequence] = pkt.payload
-
+        should_reassemble = False
         with STATE_LOCK:
+            # Handle duplicate arrivals (from multi-path flooding)
+            if pkt.packet_id in self.seen_packets:
+                APP_STATE["stats"]["duplicates_dropped"] += 1
+                return
+
+            self.seen_packets.add(pkt.packet_id)
+
+            if self.total_chunks is None:
+                self.total_chunks = pkt.total_chunks
+
+            self.received_chunks[pkt.chunk_sequence] = pkt.payload
+
             APP_STATE["stats"]["chunks_received"] = len(self.received_chunks)
             APP_STATE["stats"]["received_chunk_indices"] = sorted(list(self.received_chunks.keys()))
+
+            if len(self.received_chunks) == self.total_chunks:
+                should_reassemble = True
 
         add_event("receive", f"Stored fragment #{pkt.chunk_sequence} ({len(self.received_chunks)}/{self.total_chunks})", "receiver")
 
         # Check if all chunks have arrived
-        if len(self.received_chunks) == self.total_chunks:
+        if should_reassemble:
             self._reassemble_and_decrypt()
 
     def _reassemble_and_decrypt(self):
@@ -711,6 +745,14 @@ class LabHttpHandler(SimpleHTTPRequestHandler):
             self._serve_file(noise_path, 'image/png')
         elif path == '/api/image/reconstructed':
             self._serve_file(os.path.join(BASE_DIR, 'output', 'lab_received_image.png'), 'image/png')
+        elif path == '/placeholder.png':
+            # Serve 1x1 transparent PNG directly from memory to prevent file missing errors
+            transparent_png = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\rIDATx\x9cc`\x00\x00\x00\x02\x00\x01H\xaf\xa4q\x00\x00\x00\x00IEND\xaeB`\x82'
+            self.send_response(200)
+            self.send_header('Content-Type', 'image/png')
+            self.send_header('Content-Length', str(len(transparent_png)))
+            self.end_headers()
+            self.wfile.write(transparent_png)
         else:
             # Fallback to static web files
             super().do_GET()
@@ -769,6 +811,20 @@ class LabHttpHandler(SimpleHTTPRequestHandler):
                     if b'filename="' in part:
                         header_end = part.find(b"\r\n\r\n")
                         file_data = part[header_end + 4:].rstrip(b"\r\n--")
+
+                        # Auto-optimize large images for real-time socket transmission
+                        if HAS_PIL:
+                            try:
+                                from io import BytesIO
+                                img = Image.open(BytesIO(file_data))
+                                if img.width > 600 or img.height > 600 or len(file_data) > 300 * 1024:
+                                    img.thumbnail((600, 600))
+                                    buf = BytesIO()
+                                    img.save(buf, format='PNG', optimize=True)
+                                    file_data = buf.getvalue()
+                            except Exception:
+                                pass
+
                         dest = os.path.join(BASE_DIR, 'assets', 'input_image.png')
                         with open(dest, 'wb') as f:
                             f.write(file_data)
