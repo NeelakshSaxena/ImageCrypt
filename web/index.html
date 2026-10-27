@@ -138,7 +138,7 @@
                                     <span class="tag">Cleartext</span>
                                 </div>
                                 <div class="preview-canvas-wrapper">
-                                    <img id="imgOriginalPreview" src="/api/image/original" alt="Original Image Preview" onerror="this.src='/placeholder.png';">
+                                    <img id="imgOriginalPreview" src="/api/image/original" alt="Original Image Preview" onerror="this.onerror=null; this.src='/placeholder.png';">
                                 </div>
                             </div>
                             <div class="preview-box">
@@ -147,7 +147,7 @@
                                     <span class="tag tag-amber">Encrypted Noise</span>
                                 </div>
                                 <div class="preview-canvas-wrapper">
-                                    <img id="imgEncryptedPreview" src="/api/image/encrypted" alt="Encrypted Noise Preview" onerror="this.src='/placeholder.png';">
+                                    <img id="imgEncryptedPreview" src="/api/image/encrypted" alt="Encrypted Noise Preview" onerror="this.onerror=null; this.src='/placeholder.png';">
                                 </div>
                             </div>
                         </div>
@@ -503,7 +503,7 @@
                     </div>
                     <div class="card-body text-center">
                         <div class="showcase-img-wrapper">
-                            <img id="rxEncryptedNoiseImg" src="/api/image/encrypted" alt="Encrypted State" onerror="this.src='/placeholder.png';">
+                            <img id="rxEncryptedNoiseImg" src="/api/image/encrypted" alt="Encrypted State" onerror="this.onerror=null; this.src='/placeholder.png';">
                         </div>
                         <p class="img-caption text-muted">What intermediate nodes forward without key</p>
                     </div>
@@ -516,7 +516,7 @@
                     </div>
                     <div class="card-body text-center">
                         <div class="showcase-img-wrapper">
-                            <img id="rxReconstructedImg" src="/api/image/reconstructed" alt="Decrypted Output" onerror="this.src='/placeholder.png';">
+                            <img id="rxReconstructedImg" src="/api/image/reconstructed" alt="Decrypted Output" onerror="this.onerror=null; this.src='/placeholder.png';">
                         </div>
                         <div class="action-row">
                             <a id="btnDownloadImage" href="/api/image/reconstructed" download="reconstructed_image.png" class="btn btn-secondary btn-sm disabled">
